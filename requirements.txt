@@ -2,6 +2,6 @@ streamlit
 openai
 gtts
 deep-translator
-speechrecognition
+
 pyaudio
 requests

@@ -1,1 +1,10 @@
+Flask
+pytesseract
+PyMuPDF
+Pillow
+openai
+deep-translator
+pyttsx3
+python-docx
+Werkzeug
 

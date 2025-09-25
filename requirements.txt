@@ -2,8 +2,6 @@ streamlit
 openai
 gtts
 deep-translator
+speechrecognition
+pyaudio
 requests
-pdfplumber
-python-docx
-pillow
-

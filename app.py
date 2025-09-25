@@ -6,7 +6,7 @@ from deep_translator import GoogleTranslator
 from gtts import gTTS
 import streamlit as st
 from io import BytesIO
-import speech_recognition as sr
+#import speech_recognition as sr
 
 # ===============================
 # 1️⃣ API KEYS
@@ -58,7 +58,7 @@ def text_to_speech(text, lang="en"):
 # ===============================
 # 3️⃣ Voice Command Input
 # ===============================
-def voice_command_input(prompt="Say a command:"):
+'''def voice_command_input(prompt="Say a command:"):
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         st.info(prompt)
@@ -70,7 +70,7 @@ def voice_command_input(prompt="Say a command:"):
             return ""
         except sr.RequestError:
             st.error("Speech recognition service failed.")
-            return ""
+            return ""'''
 
 # ===============================
 # 4️⃣ Streamlit App UI

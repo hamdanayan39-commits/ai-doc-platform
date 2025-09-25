@@ -14,7 +14,7 @@ import speech_recognition as sr
 OPENAI_API_KEY = "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"
 OCR_API_KEY = "K87313976288957"
 
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY
 
 # ===============================
 # 2️⃣ OCR & Summarization
@@ -32,9 +32,12 @@ def extract_text_online(file):
         return ""
 
 def summarize_text_openai(text):
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": f"Summarize this document in simple language:\n{text}"}],
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that summarizes text."},
+            {"role": "user", "content": f"Summarize this document in simple language:\n{text}"}
+        ],
         max_tokens=250
     )
     return response.choices[0].message.content.strip()
@@ -72,11 +75,10 @@ def voice_command_input(prompt="Say a command:"):
 # ===============================
 # 4️⃣ Streamlit App UI
 # ===============================
-st.title("Hackathon Voice-Controlled Analyzer")
+st.title("📄 AI Voice-Controlled Document Analyzer")
 
 # File Upload Section
 uploaded_file = st.file_uploader("Upload PDF/DOCX/Image", type=["pdf","docx","png","jpg","jpeg","tiff"])
-selected_class = st.selectbox("Choose Class / Department", ["General","ClassA","ClassB"])
 lang = st.selectbox("Select Language", ["en","hi","ml","ar","fr"])
 
 # Process uploaded files
@@ -90,12 +92,14 @@ if uploaded_file is not None:
         audio_base64 = text_to_speech(translated, lang)
         st.audio(base64.b64decode(audio_base64))
     else:
-        st.error("No text could be extracted from the uploaded file.")
+        st.warning("⚠️ No text could be extracted from the uploaded file.")
 
 # Voice Command Section
-if st.button("Use Voice Command"):
+if st.button("🎙️ Use Voice Command"):
     command = voice_command_input()
     if command:
         st.success(f"Command detected: {command}")
+        if "upload" in command:
+            st.info("Please upload a file above to process it.")
     else:
         st.warning("No voice command detected.")

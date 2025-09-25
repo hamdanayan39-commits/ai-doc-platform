@@ -5,5 +5,5 @@ deep-translator
 requests
 pdfplumber
 python-docx
-Pillow
+pillow
 

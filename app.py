@@ -9,7 +9,6 @@ import json
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
-import plotly.graph_objects as go
 
 # API Keys from Streamlit Secrets
 try:
@@ -310,7 +309,6 @@ def text_to_speech_advanced(text, lang="en"):
         
         return base64.b64encode(audio_fp.read()).decode("utf-8")
     except Exception as e:
-        # Fallback to alternative TTS service
         st.warning(f"Primary TTS failed: {str(e)}")
         return ""
 
@@ -356,6 +354,14 @@ def create_department_dashboard(analysis_result):
     </div>
     """, unsafe_allow_html=True)
 
+# Initialize session state
+if 'extracted_text' not in st.session_state:
+    st.session_state.extracted_text = None
+if 'analysis_result' not in st.session_state:
+    st.session_state.analysis_result = None
+if 'ai_summary' not in st.session_state:
+    st.session_state.ai_summary = None
+
 # Main App Interface
 st.set_page_config(
     page_title="KML AI Document Hub",
@@ -375,10 +381,8 @@ with st.sidebar:
     st.markdown("### 🎛️ Control Panel")
     
     # Department filter
-    selected_dept = st.selectbox(
-        "Filter by Department",
-        ["All Departments"] + [dept["name"] for dept in KML_DEPARTMENTS.values()]
-    )
+    department_names = ["All Departments"] + [dept["name"] for dept in KML_DEPARTMENTS.values()]
+    selected_dept = st.selectbox("Filter by Department", department_names)
     
     # AI Analysis Level
     analysis_level = st.radio(
@@ -454,8 +458,8 @@ with tab1:
 with tab2:
     st.markdown("### 🧠 Advanced AI Analysis")
     
-    if 'extracted_text' in st.session_state:
-        if st.button("🚀 Start Deep Analysis", type="primary", use_container_width=True, use_container_width=True):
+    if st.session_state.extracted_text:
+        if st.button("🚀 Start Deep Analysis", type="primary", use_container_width=True):
             with st.spinner("🤖 AI is analyzing document content..."):
                 # Advanced AI analysis
                 analysis_result = analyze_document_with_ai(st.session_state.extracted_text)
@@ -493,7 +497,7 @@ with tab2:
 with tab3:
     st.markdown("### 📈 KML Department Dashboard")
     
-    if 'analysis_result' in st.session_state:
+    if st.session_state.analysis_result:
         create_department_dashboard(st.session_state.analysis_result)
         
         # Department visualization
@@ -515,7 +519,7 @@ with tab3:
 with tab4:
     st.markdown("### ⚡ Quick Actions")
     
-    if 'analysis_result' in st.session_state:
+    if st.session_state.analysis_result:
         analysis_result = st.session_state.analysis_result
         department = analysis_result.get("recommended_department", "operations")
         dept_info = KML_DEPARTMENTS.get(department)
@@ -546,10 +550,10 @@ with tab4:
             
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🚨 Alert Management", type="secondary", use_container_width=True):
+                if st.button("🚨 Alert Management", use_container_width=True):
                     st.error("Management team alerted!")
             with col2:
-                if st.button("📱 Mobile Notification", type="secondary", use_container_width=True):
+                if st.button("📱 Mobile Notification", use_container_width=True):
                     st.error("Mobile alerts sent to department!")
     
     else:

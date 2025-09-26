@@ -33,12 +33,6 @@ LANGUAGES = {
     "ta": "Tamil",
     "fr": "French"
 }
-chosen_lang = st.sidebar.selectbox(
-    "🌐 Select output language",
-    options=list(LANGUAGES.keys()),
-    format_func=lambda x: LANGUAGES[x],
-    index=0
-)
 
 # ===============================
 # 🏢 Departments
@@ -73,7 +67,7 @@ def extract_text_from_image(file):
         r = requests.post(
             "https://api.ocr.space/parse/image",
             files={"file": file},
-            data={"apikey": OCR_API_KEY, "language": chosen_lang},
+            data={"apikey": OCR_API_KEY, "language": "eng"},  # OCR best in English
             timeout=30
         )
         result = r.json()
@@ -149,6 +143,14 @@ def text_to_audio_base64(text, lang="en"):
 st.set_page_config(page_title="KMRL AI Hub", page_icon="🚇", layout="wide")
 
 st.markdown("<h1 style='text-align:center; color:#1e3c72;'>🚇 KMRL AI Document Hub</h1>", unsafe_allow_html=True)
+
+# 🌐 Language selector in main UI
+chosen_lang = st.selectbox(
+    "🌐 Select output language",
+    options=list(LANGUAGES.keys()),
+    format_func=lambda x: LANGUAGES[x],
+    index=0
+)
 
 tab1, tab2, tab3 = st.tabs(["📁 Upload", "🤖 AI Analysis", "📊 Dashboard"])
 

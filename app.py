@@ -12,7 +12,6 @@ import plotly.express as px
 # 🔐 SECURE API KEY MANAGEMENT
 # ===============================
 def get_api_keys():
-    """Secure API key handling"""
     try:
         OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
         OCR_API_KEY = st.secrets.get("OCR_API_KEY", "")
@@ -41,11 +40,6 @@ st.markdown("""
 .kmrl-upload-zone { border: 3px dashed #FF6B35; border-radius: 20px; padding: 3rem 2rem; text-align: center; background: rgba(255, 107, 53, 0.05); transition: all 0.3s ease; margin: 2rem 0; }
 .kmrl-upload-zone:hover { background: rgba(255, 107, 53, 0.1); border-color: #2a5298; }
 .kmrl-metric-card { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 1.5rem; border-radius: 10px; text-align: center; margin: 0.5rem; }
-.kmrl-action-button { background: linear-gradient(45deg, #FF6B35, #FF8E53); color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: 600; margin: 5px; cursor: pointer; transition: all 0.3s ease; width: 100%; }
-.kmrl-action-button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 107, 53, 0.4); }
-.kmrl-status-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: 600; margin: 5px; }
-.kmrl-status-active { background: #4CAF50; color: white; }
-.kmrl-status-inactive { background: #f44336; color: white; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -162,11 +156,63 @@ if 'analysis_result' not in st.session_state: st.session_state.analysis_result =
 
 st.markdown('<div class="kmrl-brand-header"><h1>🚇 KMRL AI Document Management</h1></div>', unsafe_allow_html=True)
 
-# Tabs
+# ---------- TABS ----------
 tab1, tab2, tab3 = st.tabs(["📁 Upload", "🤖 AI Analysis", "📊 Dashboard"])
 
-# ---------- TAB 1 ----------
+# ----- TAB 1: Upload -----
 with tab1:
-    uploaded_file = st.file_uploader("Choose a document", type=["pdf","docx","png","jpg","jpeg","tiff"])
+    uploaded_file = st.file_uploader(
+        "Choose a document", 
+        type=["pdf","docx","png","jpg","jpeg","tiff"]
+    )
     if uploaded_file:
-        if st.button("Extract Text
+        if st.button("🔍 Extract Text Content", use_container_width=True):
+            with st.spinner("Extracting text..."):
+                extracted_text = extract_text_online(uploaded_file)
+                if extracted_text and not any(err in extracted_text.lower() for err in ["error", "failed"]):
+                    st.session_state.extracted_text = extracted_text
+                    st.success("✅ Text extraction successful!")
+                    with st.expander("📋 Preview Extracted Text", expanded=True):
+                        st.text_area(
+                            "", 
+                            extracted_text[:800] + "..." if len(extracted_text) > 800 else extracted_text, 
+                            height=200
+                        )
+                else:
+                    st.error(f"❌ Extraction failed: {extracted_text}")
+
+# ----- TAB 2: AI Analysis -----
+with tab2:
+    if st.session_state.extracted_text:
+        if st.button("🚀 Start AI Analysis", use_container_width=True):
+            with st.spinner("Analyzing document..."):
+                result = analyze_document_with_ai(st.session_state.extracted_text)
+                if "error" not in result:
+                    st.session_state.analysis_result = result
+                    st.success("✅ AI Analysis Complete!")
+                    st.json(result)
+                    summary = result.get("summary", "")
+                    audio_data = text_to_speech(summary)
+                    if audio_data:
+                        st.audio(base64.b64decode(audio_data), format="audio/mp3")
+                        st.download_button(
+                            "📥 Download Audio Summary",
+                            data=base64.b64decode(audio_data),
+                            file_name="kmrl_summary.mp3",
+                            mime="audio/mp3"
+                        )
+                else:
+                    st.error(f"❌ {result['error']}")
+    else:
+        st.info("👆 Upload a document first.")
+
+# ----- TAB 3: Dashboard -----
+with tab3:
+    st.markdown("### 📊 Department Metrics")
+    dept_data = pd.DataFrame({
+        'Department': [d['name'] for d in KMRL_DEPARTMENTS.values()],
+        'Documents Processed': [45,32,28,15,8],
+        'Avg Response Time': [1.2,2.5,3.1,4.2,1.8]
+    })
+    fig = px.bar(dept_data, x='Department', y='Documents Processed', color='Department')
+    st.plotly_chart(fig, use_container_width=True)

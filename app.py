@@ -16,32 +16,35 @@ import openai
 def get_api_keys():
     """Secure API key handling"""
     try:
-        # Streamlit secrets
         OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
         OCR_API_KEY = st.secrets.get("OCR_API_KEY", "K87313976288957")
-        
         if OPENAI_API_KEY:
             st.sidebar.success("✅ API keys loaded securely")
             return OPENAI_API_KEY, OCR_API_KEY
         else:
             st.sidebar.warning("🔐 Using development mode - configure secrets for production")
-            return ("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",
-                    "K87313976288957")
+            return (
+                "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",
+                "K87313976288957"
+            )
     except Exception as e:
         st.error(f"Configuration error: {e}")
         return "", "K87313976288957"
 
 OPENAI_API_KEY, OCR_API_KEY = get_api_keys()
-openai.api_key = OPENAI_API_KEY  # Set OpenAI key
+openai.api_key = OPENAI_API_KEY
 
 # ===============================
 # 🔧 CORE FUNCTIONS
 # ===============================
 def test_api_connections():
-    """Test API connections"""
     results = {}
     try:
-        models = openai.Model.list()
+        openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "Test API"}],
+            max_tokens=1
+        )
         results['openai'] = True
     except:
         results['openai'] = False
@@ -51,20 +54,16 @@ def test_api_connections():
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return text.strip() if text.strip() else "No text could be extracted from PDF."
+        text = "".join([page.extract_text() + "\n" for page in pdf_reader.pages])
+        return text.strip() or "No text could be extracted from PDF."
     except Exception as e:
         return f"PDF extraction failed: {str(e)}"
 
 def extract_text_from_docx(file):
     try:
         doc = docx.Document(file)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        return text.strip() if text.strip() else "No text could be extracted from DOCX."
+        text = "".join([p.text + "\n" for p in doc.paragraphs])
+        return text.strip() or "No text could be extracted from DOCX."
     except Exception as e:
         return f"DOCX extraction failed: {str(e)}"
 
@@ -78,29 +77,26 @@ def extract_text_from_image(file):
         )
         result = r.json()
         if r.status_code == 200 and "ParsedResults" in result:
-            extracted_text = result["ParsedResults"][0]["ParsedText"]
-            return extracted_text.strip() if extracted_text.strip() else "No text found in image."
-        else:
-            return "OCR API Error"
+            text = result["ParsedResults"][0]["ParsedText"]
+            return text.strip() or "No text found in image."
+        return "OCR API Error"
     except Exception as e:
         return f"OCR extraction failed: {str(e)}"
 
 def extract_text_online(file):
-    file_type = file.type
-    if file_type == "application/pdf":
+    if file.type == "application/pdf":
         return extract_text_from_pdf(file)
-    elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         return extract_text_from_docx(file)
-    elif file_type.startswith('image/'):
+    elif file.type.startswith('image/'):
         return extract_text_from_image(file)
     else:
-        return f"Unsupported file type: {file_type}"
+        return f"Unsupported file type: {file.type}"
 
 def analyze_document_with_ai(text):
-    """AI analysis function using official OpenAI library"""
-    if not OPENAI_API_KEY:
+    """AI analysis using new OpenAI API (>=1.0.0)"""
+    if not openai.api_key:
         return {"error": "OpenAI API key not configured"}
-    
     try:
         prompt = f"""
         Analyze this KMRL document and return JSON with:
@@ -108,11 +104,9 @@ def analyze_document_with_ai(text):
         - "priority_level": [low, medium, high, critical]
         - "recommended_department": which KMRL department should handle this
         - "summary": brief 2-3 sentence summary
-        
         Document: {text[:1500]}
         """
-        
-        response = openai.ChatCompletion.create(
+        response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a KMRL document analysis assistant. Return valid JSON."},
@@ -121,20 +115,16 @@ def analyze_document_with_ai(text):
             max_tokens=300,
             temperature=0.1
         )
-        
-        content = response['choices'][0]['message']['content'].strip()
-        # Clean JSON if wrapped in ```
+        content = response.choices[0].message.content.strip()
         if '```json' in content:
             content = content.split('```json')[1].split('```')[0]
         elif '```' in content:
             content = content.split('```')[1].split('```')[0]
-        
         return json.loads(content)
     except Exception as e:
         return {"error": f"Analysis failed: {str(e)}"}
 
 def text_to_speech(text, lang="en"):
-    """Convert text to speech"""
     if not text.strip():
         return ""
     try:
@@ -157,16 +147,15 @@ if 'extracted_text' not in st.session_state:
 if 'analysis_result' not in st.session_state:
     st.session_state.analysis_result = None
 
-# KMRL UI Header
 st.markdown("<h1 style='text-align:center; color:#FF6B35;'>🚇 KMRL AI Document Hub</h1>", unsafe_allow_html=True)
 
-# Test APIs
+# API Status
 api_status = test_api_connections()
 st.sidebar.markdown("### 🔧 API Status")
 st.sidebar.write(f"OpenAI API: {'✅ Active' if api_status['openai'] else '❌ Inactive'}")
 st.sidebar.write(f"OCR API: {'✅ Active' if api_status['ocr'] else '❌ Inactive'}")
 
-# Upload Tab
+# Upload Document
 uploaded_file = st.file_uploader("Upload document (PDF, DOCX, Images)", type=["pdf","docx","png","jpg","jpeg","tiff"])
 if uploaded_file:
     if st.button("Extract Text"):
@@ -174,7 +163,7 @@ if uploaded_file:
         st.session_state.extracted_text = text
         st.text_area("Extracted Text Preview", text, height=200)
 
-# AI Analysis Tab
+# AI Analysis
 if st.session_state.extracted_text:
     if st.button("Analyze Document with AI"):
         result = analyze_document_with_ai(st.session_state.extracted_text)
@@ -185,7 +174,7 @@ if st.session_state.extracted_text:
             if audio_data:
                 st.audio(base64.b64decode(audio_data), format="audio/mp3")
 
-# Simple Dashboard Example
+# Dashboard
 st.markdown("### 📊 KMRL Dashboard")
 dept_data = pd.DataFrame({
     'Department': ["Operations","Maintenance","Safety","Finance","IT"],

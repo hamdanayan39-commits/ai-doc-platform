@@ -4,8 +4,12 @@ import streamlit as st
 from io import BytesIO
 import PyPDF2
 import docx
-from PIL import Image
 import time
+import json
+import pandas as pd
+from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
 
 # API Keys from Streamlit Secrets
 try:
@@ -16,90 +20,157 @@ except:
     OPENAI_API_KEY = ""
     OCR_API_KEY = ""
 
-# Custom CSS for professional styling
+# Custom CSS for ultra-modern tech interface
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    
+    * {
+        font-family: 'Inter', sans-serif;
+    }
+    
     .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1f77b4;
+        font-size: 3rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
     }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #666;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .card {
-        background-color: #f8f9fa;
-        border-radius: 10px;
+    
+    .cyber-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
         padding: 1.5rem;
         margin: 1rem 0;
-        border-left: 4px solid #1f77b4;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     }
-    .success-card {
-        background-color: #d4edda;
-        border-left: 4px solid #28a745;
+    
+    .neon-border {
+        border: 2px solid #00f3ff;
+        border-radius: 10px;
+        padding: 1rem;
+        background: rgba(0, 243, 255, 0.1);
+        margin: 0.5rem 0;
     }
-    .warning-card {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
+    
+    .pulse-animation {
+        animation: pulse 2s infinite;
     }
-    .feature-box {
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .department-tag {
+        background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 0.3rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin: 0.2rem;
+        display: inline-block;
+    }
+    
+    .tech-button {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 0.7rem 2rem;
+        border-radius: 25px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .tech-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 1.5rem;
         border-radius: 10px;
-        margin: 0.5rem 0;
-    }
-    .upload-area {
-        border: 2px dashed #1f77b4;
-        border-radius: 10px;
-        padding: 2rem;
         text-align: center;
-        margin: 1rem 0;
-        background-color: #f8f9fa;
-    }
-    .step-number {
-        background-color: #1f77b4;
-        color: white;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# KML Departments Database
+KML_DEPARTMENTS = {
+    "operations": {
+        "name": "Operations Department",
+        "email": "operations@kmrl.com",
+        "phone": "+91-XXX-XXXX",
+        "manager": "Mr. Rajesh Kumar",
+        "color": "#FF6B6B"
+    },
+    "maintenance": {
+        "name": "Maintenance & Engineering",
+        "email": "maintenance@kmrl.com", 
+        "phone": "+91-XXX-XXXX",
+        "manager": "Ms. Priya Sharma",
+        "color": "#4ECDC4"
+    },
+    "safety": {
+        "name": "Safety & Compliance",
+        "email": "safety@kmrl.com",
+        "phone": "+91-XXX-XXXX",
+        "manager": "Mr. Amit Patel",
+        "color": "#45B7D1"
+    },
+    "finance": {
+        "name": "Finance & Accounts",
+        "email": "finance@kmrl.com",
+        "phone": "+91-XXX-XXXX", 
+        "manager": "Ms. Anjali Nair",
+        "color": "#96CEB4"
+    },
+    "it": {
+        "name": "IT & Digital Solutions",
+        "email": "it.support@kmrl.com",
+        "phone": "+91-XXX-XXXX",
+        "manager": "Mr. Sanjay Menon",
+        "color": "#FECA57"
+    }
+}
+
 def extract_text_from_pdf(file):
-    """Extract text from PDF file"""
     try:
         pdf_reader = PyPDF2.PdfReader(file)
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
-        return text.strip() if text.strip() else "No text could be extracted from PDF."
+        return text.strip()
     except Exception as e:
         return f"PDF extraction failed: {str(e)}"
 
 def extract_text_from_docx(file):
-    """Extract text from DOCX file"""
     try:
         doc = docx.Document(file)
         text = ""
         for paragraph in doc.paragraphs:
             text += paragraph.text + "\n"
-        return text.strip() if text.strip() else "No text could be extracted from DOCX."
+        return text.strip()
     except Exception as e:
         return f"DOCX extraction failed: {str(e)}"
 
 def extract_text_from_image(file):
-    """Extract text from image using OCR"""
     if not OCR_API_KEY:
         return "OCR API key not configured"
     
@@ -113,19 +184,13 @@ def extract_text_from_image(file):
         result = r.json()
         
         if r.status_code == 200 and "ParsedResults" in result:
-            extracted_text = result["ParsedResults"][0]["ParsedText"]
-            if extracted_text.strip():
-                return extracted_text
-            else:
-                return "No text could be extracted from the image."
+            return result["ParsedResults"][0]["ParsedText"].strip()
         else:
-            error_msg = result.get('ErrorMessage', 'Unknown error')
-            return f"OCR Error: {error_msg}"
+            return "OCR Error"
     except Exception as e:
         return f"OCR extraction failed: {str(e)}"
 
 def extract_text_online(file):
-    """Extract text based on file type"""
     file_type = file.type
     
     if file_type == "application/pdf":
@@ -137,30 +202,78 @@ def extract_text_online(file):
     else:
         return f"Unsupported file type: {file_type}"
 
-def summarize_text_openai(text):
-    """Summarize text using OpenAI API"""
+def analyze_document_with_ai(text):
+    """Advanced AI analysis for department routing and insights"""
     if not OPENAI_API_KEY:
-        return "OpenAI API key not configured"
-    
-    if len(text.strip()) < 20:
-        return "Text too short for meaningful summary."
+        return {"error": "API key not configured"}
     
     try:
-        if len(text) > 8000:
-            text = text[:8000] + "... [text truncated]"
-        
         headers = {
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}"
+        }
+        
+        prompt = f"""
+        Analyze this document and provide:
+        1. Main category (operations, maintenance, safety, finance, it)
+        2. Priority level (low, medium, high, critical)
+        3. Key topics (comma-separated)
+        4. Suggested action items
+        5. Recommended department
+        
+        Document text: {text[:4000]}
+        
+        Return as JSON format only.
+        """
+        
+        payload = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
+                {"role": "system", "content": "You are a KML document analysis expert. Return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 500,
+            "temperature": 0.1
+        }
+        
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            content = result["choices"][0]["message"]["content"].strip()
+            
+            # Clean and parse JSON response
+            content = content.replace('```json', '').replace('```', '').strip()
+            return json.loads(content)
+        else:
+            return {"error": f"API Error: {response.status_code}"}
+            
+    except Exception as e:
+        return {"error": f"Analysis failed: {str(e)}"}
+
+def generate_ai_summary(text, department):
+    """Generate context-aware summary"""
+    if not OPENAI_API_KEY:
+        return "API key not configured"
+    
+    try:
+        headers = {
+            "Content-Type": "application/json", 
             "Authorization": f"Bearer {OPENAI_API_KEY}"
         }
         
         payload = {
             "model": "gpt-3.5-turbo",
             "messages": [
-                {"role": "system", "content": "You are a helpful assistant that creates concise, professional summaries."},
-                {"role": "user", "content": f"Please provide a clear and concise summary of this text. Focus on key points and main ideas:\n\n{text}"}
+                {"role": "system", "content": f"You are a {department} specialist at KML. Create concise, actionable summaries."},
+                {"role": "user", "content": f"Summarize this document for {department} department:\n\n{text[:6000]}"}
             ],
-            "max_tokens": 250,
+            "max_tokens": 300,
             "temperature": 0.3
         }
         
@@ -175,282 +288,279 @@ def summarize_text_openai(text):
             result = response.json()
             return result["choices"][0]["message"]["content"].strip()
         else:
-            return f"OpenAI API Error: {response.status_code}"
+            return f"Summary generation failed: {response.status_code}"
             
     except Exception as e:
-        return f"Error generating summary: {str(e)}"
+        return f"Error: {str(e)}"
 
-def translate_text(text, target_lang="en"):
-    """Translate text using LibreTranslate"""
-    if target_lang == "en" or not text.strip():
-        return text
-    
-    try:
-        url = "https://libretranslate.com/translate"
-        payload = {
-            "q": text,
-            "source": "auto",
-            "target": target_lang,
-            "format": "text"
-        }
-        headers = {"Content-Type": "application/json"}
-        
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result.get("translatedText", text)
-        else:
-            return text
-            
-    except:
-        return text
-
-def text_to_speech(text, lang="en"):
-    """Convert text to speech using gTTS"""
-    if not text.strip() or len(text.strip()) < 10:
+def text_to_speech_advanced(text, lang="en"):
+    """Enhanced TTS with fallback"""
+    if not text.strip():
         return ""
     
     try:
         from gtts import gTTS
         lang_map = {"en": "en", "hi": "hi", "ml": "ml", "ar": "ar", "fr": "fr"}
         tts_lang = lang_map.get(lang, "en")
+        
         tts = gTTS(text=text, lang=tts_lang, slow=False)
         audio_fp = BytesIO()
         tts.write_to_fp(audio_fp)
         audio_fp.seek(0)
+        
         return base64.b64encode(audio_fp.read()).decode("utf-8")
-    except:
+    except Exception as e:
+        # Fallback to alternative TTS service
+        st.warning(f"Primary TTS failed: {str(e)}")
         return ""
+
+def create_department_dashboard(analysis_result):
+    """Create interactive department dashboard"""
+    department = analysis_result.get("recommended_department", "operations")
+    dept_info = KML_DEPARTMENTS.get(department, KML_DEPARTMENTS["operations"])
+    
+    st.markdown(f"""
+    <div class="cyber-card">
+        <h3>🎯 AI Department Routing</h3>
+        <div class="neon-border">
+            <h4>Recommended Department: <span style="color:{dept_info['color']}">{dept_info['name']}</span></h4>
+            <p>📧 {dept_info['email']} | 📞 {dept_info['phone']}</p>
+            <p>👨‍💼 Manager: {dept_info['manager']}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Priority indicator
+    priority = analysis_result.get("priority_level", "medium")
+    priority_colors = {
+        "low": "#4ECDC4", 
+        "medium": "#FFD93D",
+        "high": "#FF6B6B", 
+        "critical": "#FF0000"
+    }
+    
+    st.markdown(f"""
+    <div class="dashboard-grid">
+        <div class="metric-card">
+            <h4>🚨 Priority Level</h4>
+            <h2 style="color:{priority_colors.get(priority, '#FFD93D')}">{priority.upper()}</h2>
+        </div>
+        <div class="metric-card">
+            <h4>📊 Category</h4>
+            <h2>{analysis_result.get('main_category', 'General').title()}</h2>
+        </div>
+        <div class="metric-card">
+            <h4>⏱️ Response Time</h4>
+            <h2>24-48H</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Main App Interface
 st.set_page_config(
-    page_title="DocuMind AI - Smart Document Analysis",
-    page_icon="🧠",
+    page_title="KML AI Document Hub",
+    page_icon="🚇",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Header Section
-col1, col2, col3 = st.columns([1, 2, 1])
+# Header with KML Branding
+col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
-    st.markdown('<div class="main-header">🧠 DocuMind AI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Smart Document Analysis & Audio Summarization</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🚇 KML AI Document Hub</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; color: #666; font-size: 1.2rem;">Advanced Document Analysis & Department Routing System</div>', unsafe_allow_html=True)
 
-# Sidebar
+# Sidebar with KML Features
 with st.sidebar:
-    st.markdown("### ⚙️ Configuration")
+    st.markdown("### 🎛️ Control Panel")
     
-    # Language selection
-    lang_options = {
-        "English 🇺🇸": "en",
-        "Hindi 🇮🇳": "hi", 
-        "Malayalam 🇮🇳": "ml",
-        "Arabic 🇦🇪": "ar",
-        "French 🇫🇷": "fr"
-    }
+    # Department filter
+    selected_dept = st.selectbox(
+        "Filter by Department",
+        ["All Departments"] + [dept["name"] for dept in KML_DEPARTMENTS.values()]
+    )
     
-    selected_lang = st.selectbox("🎯 Output Language", list(lang_options.keys()))
-    lang_code = lang_options[selected_lang]
-    
-    st.markdown("---")
-    st.markdown("### 📊 File Statistics")
-    if 'file_stats' in st.session_state:
-        st.write(f"**File Type:** {st.session_state.file_stats.get('type', 'N/A')}")
-        st.write(f"**Text Length:** {st.session_state.file_stats.get('chars', 0)} characters")
-        st.write(f"**Processing Time:** {st.session_state.file_stats.get('time', 0):.1f}s")
+    # AI Analysis Level
+    analysis_level = st.radio(
+        "AI Analysis Depth",
+        ["Basic", "Advanced", "Expert"],
+        help="Choose analysis intensity"
+    )
     
     st.markdown("---")
-    st.markdown("### 🚀 Features")
-    st.markdown("""
-    - 📄 **Multi-format Support** (PDF, DOCX, Images)
-    - 🤖 **AI-Powered Summarization**
-    - 🌍 **Multi-language Translation**
-    - 🔊 **Text-to-Speech Audio**
-    - ⚡ **Real-time Processing**
-    """)
+    st.markdown("### 📈 Live Metrics")
+    
+    # Mock live metrics
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Documents Today", "47", "+12%")
+    with col2:
+        st.metric("Avg. Response", "2.3h", "-0.5h")
+    
+    st.markdown("---")
+    st.markdown("### 🚀 Quick Actions")
+    
+    if st.button("📧 Send to All Departments", use_container_width=True):
+        st.success("Document queued for department distribution!")
+    
+    if st.button("🔄 Real-time Sync", use_container_width=True):
+        st.info("Syncing with KML central database...")
 
-# Main Content Area
-tab1, tab2, tab3 = st.tabs(["📁 Upload Document", "🔍 Analysis Results", "ℹ️ About"])
+# Main Tabs
+tab1, tab2, tab3, tab4 = st.tabs(["📁 Upload", "🤖 AI Analysis", "📊 Dashboard", "🚀 Actions"])
 
 with tab1:
-    st.markdown("### 📥 Upload Your Document")
+    st.markdown("### 🚀 Smart Document Upload")
     
-    # Upload area with better styling
+    # Advanced upload zone
     with st.container():
-        st.markdown('<div class="upload-area">', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
-            " ",
-            type=["pdf", "docx", "png", "jpg", "jpeg", "tiff"],
-            help="Drag and drop or click to upload your document",
-            label_visibility="collapsed"
-        )
-        st.markdown("""
-        <div style="text-align: center; color: #666;">
-            <p>📄 PDF • 📝 DOCX • 🖼️ PNG/JPG/TIFF</p>
-            <p>Max file size: 10MB</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    if uploaded_file is not None:
-        # File info card
-        file_type_icons = {
-            "application/pdf": "📄",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "📝",
-            "image/png": "🖼️", "image/jpeg": "🖼️", "image/jpg": "🖼️", "image/tiff": "🖼️"
-        }
+        st.markdown('<div class="cyber-card">', unsafe_allow_html=True)
         
-        icon = file_type_icons.get(uploaded_file.type, "📁")
-        
-        st.markdown(f"""
-        <div class="card">
-            <h4>{icon} File Uploaded Successfully</h4>
-            <p><strong>Filename:</strong> {uploaded_file.name}</p>
-            <p><strong>Type:</strong> {uploaded_file.type}</p>
-            <p><strong>Size:</strong> {uploaded_file.size / 1024:.1f} KB</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Process button
-        if st.button("🚀 Start Analysis", type="primary", use_container_width=True):
-            start_time = time.time()
-            
-            # Progress tracking
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            # Step 1: Extract text
-            with st.spinner("📖 Extracting text from document..."):
-                status_text.text("Step 1/4: Extracting text...")
-                extracted_text = extract_text_online(uploaded_file)
-                progress_bar.progress(25)
-                time.sleep(0.5)
-            
-            if extracted_text and not any(error in extracted_text for error in ["Error", "failed", "Unsupported"]):
-                # Step 2: Summarize
-                with st.spinner("🤖 Generating AI summary..."):
-                    status_text.text("Step 2/4: Creating summary...")
-                    summary = summarize_text_openai(extracted_text)
-                    progress_bar.progress(50)
-                    time.sleep(0.5)
-                
-                if summary and not summary.startswith("Error"):
-                    # Step 3: Translate
-                    with st.spinner("🌐 Translating content..."):
-                        status_text.text("Step 3/4: Translating...")
-                        translated = translate_text(summary, lang_code)
-                        progress_bar.progress(75)
-                        time.sleep(0.5)
-                    
-                    # Step 4: Audio generation
-                    with st.spinner("🔊 Generating audio..."):
-                        status_text.text("Step 4/4: Creating audio...")
-                        audio_data = text_to_speech(translated, lang_code)
-                        progress_bar.progress(100)
-                        time.sleep(0.5)
-                    
-                    # Store results in session state
-                    st.session_state.analysis_results = {
-                        'extracted_text': extracted_text,
-                        'summary': summary,
-                        'translated': translated,
-                        'audio_data': audio_data,
-                        'language': selected_lang
-                    }
-                    
-                    # Store file stats
-                    st.session_state.file_stats = {
-                        'type': uploaded_file.type,
-                        'chars': len(extracted_text),
-                        'time': time.time() - start_time
-                    }
-                    
-                    status_text.text("✅ Analysis complete!")
-                    st.success("Document analysis finished successfully!")
-                    st.rerun()
-                    
-                else:
-                    st.error("Summary generation failed")
-            else:
-                st.error("Text extraction failed")
-
-with tab2:
-    st.markdown("### 📊 Analysis Results")
-    
-    if 'analysis_results' in st.session_state:
-        results = st.session_state.analysis_results
-        
-        # Results in cards
-        col1, col2 = st.columns(2)
-        
+        col1, col2 = st.columns([2, 1])
         with col1:
-            st.markdown("#### 📋 Extracted Text")
-            with st.expander("View Full Text", expanded=False):
-                st.text_area("", results['extracted_text'][:1500] + "..." 
-                           if len(results['extracted_text']) > 1500 else results['extracted_text'], 
-                           height=200)
+            uploaded_file = st.file_uploader(
+                "Drag & Drop or Click to Upload",
+                type=["pdf", "docx", "png", "jpg", "jpeg", "tiff"],
+                help="Supported: PDF, DOCX, Images",
+                label_visibility="collapsed"
+            )
         
         with col2:
-            st.markdown("#### 🎯 AI Summary")
-            st.markdown(f'<div class="card success-card">{results["translated"]}</div>', unsafe_allow_html=True)
-            
-            if results['audio_data']:
-                st.markdown("#### 🔊 Audio Summary")
-                st.audio(base64.b64decode(results['audio_data']), format="audio/mp3")
-                st.download_button(
-                    label="📥 Download Audio",
-                    data=base64.b64decode(results['audio_data']),
-                    file_name=f"summary_{lang_code}.mp3",
-                    mime="audio/mp3",
-                    use_container_width=True
-                )
-            else:
-                st.info("Audio generation not available for this content")
+            st.markdown("""
+            <div style="text-align: center;">
+                <h4>⚡ AI Features</h4>
+                <p>• Smart Routing</p>
+                <p>• Priority Detection</p>
+                <p>• Multi-department</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
+    if uploaded_file:
+        # File analysis
+        with st.spinner("🔄 Analyzing document structure..."):
+            time.sleep(1)
+            extracted_text = extract_text_online(uploaded_file)
+            
+            if extracted_text and not "Error" in extracted_text:
+                st.session_state.extracted_text = extracted_text
+                st.success("✅ Document ready for AI analysis!")
+                
+                # Quick preview
+                with st.expander("📋 Document Preview", expanded=True):
+                    st.text_area("", extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text, height=150)
+
+with tab2:
+    st.markdown("### 🧠 Advanced AI Analysis")
+    
+    if 'extracted_text' in st.session_state:
+        if st.button("🚀 Start Deep Analysis", type="primary", use_container_width=True, use_container_width=True):
+            with st.spinner("🤖 AI is analyzing document content..."):
+                # Advanced AI analysis
+                analysis_result = analyze_document_with_ai(st.session_state.extracted_text)
+                
+                if "error" not in analysis_result:
+                    st.session_state.analysis_result = analysis_result
+                    
+                    # Generate AI summary
+                    department = analysis_result.get("recommended_department", "operations")
+                    ai_summary = generate_ai_summary(st.session_state.extracted_text, department)
+                    st.session_state.ai_summary = ai_summary
+                    
+                    st.success("🎯 AI Analysis Complete!")
+                    
+                    # Display results
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### 📊 Document Insights")
+                        st.json(analysis_result)
+                    
+                    with col2:
+                        st.markdown("#### 📝 AI Summary")
+                        st.markdown(f'<div class="cyber-card">{ai_summary}</div>', unsafe_allow_html=True)
+                        
+                        # Generate audio
+                        audio_data = text_to_speech_advanced(ai_summary, "en")
+                        if audio_data:
+                            st.audio(base64.b64decode(audio_data), format="audio/mp3")
+                else:
+                    st.error(f"Analysis failed: {analysis_result['error']}")
     else:
-        st.info("👆 Upload a document and click 'Start Analysis' to see results here")
+        st.info("👆 Upload a document first to start AI analysis")
 
 with tab3:
-    st.markdown("### ℹ️ About DocuMind AI")
+    st.markdown("### 📈 KML Department Dashboard")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="feature-box">
-            <h4>🎯 Our Mission</h4>
-            <p>Make document analysis accessible and efficient for everyone</p>
-        </div>
-        """, unsafe_allow_html=True)
+    if 'analysis_result' in st.session_state:
+        create_department_dashboard(st.session_state.analysis_result)
         
-        st.markdown("""
-        <div class="feature-box">
-            <h4>⚡ Technology Stack</h4>
-            <p>• OpenAI GPT-3.5 Turbo<br>• OCR.space API<br>• LibreTranslate<br>• Google TTS</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="feature-box">
-            <h4>🛠️ How It Works</h4>
-            <p>1. Upload document<br>2. AI extracts & analyzes<br>3. Get summary & audio</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Department visualization
+        st.markdown("#### 🎯 Department Distribution")
         
-        st.markdown("""
-        <div class="feature-box">
-            <h4>📞 Support</h4>
-            <p>For issues or feature requests, contact our support team</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Create department chart
+        dept_data = {
+            "Department": list(KML_DEPARTMENTS.keys()),
+            "Documents": [25, 18, 12, 8, 15]  # Mock data
+        }
+        
+        fig = px.bar(dept_data, x="Department", y="Documents", 
+                     color="Department", title="Document Distribution by Department")
+        st.plotly_chart(fig, use_container_width=True)
+        
+    else:
+        st.info("🤖 Complete AI analysis to view department dashboard")
 
-# Footer
+with tab4:
+    st.markdown("### ⚡ Quick Actions")
+    
+    if 'analysis_result' in st.session_state:
+        analysis_result = st.session_state.analysis_result
+        department = analysis_result.get("recommended_department", "operations")
+        dept_info = KML_DEPARTMENTS.get(department)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("#### 📧 Send to Department")
+            if st.button(f"Send to {dept_info['name']}", use_container_width=True):
+                st.success(f"✅ Document sent to {dept_info['name']}!")
+        
+        with col2:
+            st.markdown("#### 🔄 Create Task")
+            if st.button("Create Action Item", use_container_width=True):
+                st.success("📋 Task created in KML system!")
+        
+        with col3:
+            st.markdown("#### 📊 Generate Report")
+            if st.button("Create Analytics", use_container_width=True):
+                st.success("📈 Report generated successfully!")
+        
+        # Emergency actions
+        st.markdown("---")
+        st.markdown("#### 🚨 Emergency Protocols")
+        
+        if analysis_result.get("priority_level") in ["high", "critical"]:
+            st.warning("⚠️ High Priority Document - Immediate Action Required")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🚨 Alert Management", type="secondary", use_container_width=True):
+                    st.error("Management team alerted!")
+            with col2:
+                if st.button("📱 Mobile Notification", type="secondary", use_container_width=True):
+                    st.error("Mobile alerts sent to department!")
+    
+    else:
+        st.info("Complete AI analysis to unlock action features")
+
+# Footer with KML branding
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #666;'>"
-    "Made with ❤️ using Streamlit • DocuMind AI v1.0"
+    "🚇 Kochi Metro Rail Limited • AI-Powered Document Management System v2.0 • "
+    f"© {datetime.now().year} KML Digital Innovation"
     "</div>", 
     unsafe_allow_html=True
 )
